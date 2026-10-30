@@ -1,4 +1,4 @@
-import { qarToPkr, round2 } from "@/lib/currency";
+import { pkrToQar, qarToPkr, round2 } from "@/lib/currency";
 
 export type PoolKey = "charity" | "debt" | "installments" | "others";
 export const POOL_KEYS: PoolKey[] = ["charity", "debt", "installments", "others"];
@@ -21,6 +21,18 @@ export function validateAllocation(input: AllocationInput) {
   );
   const familyQar = round2(input.amount - parts);
   return { ok: familyQar >= 0, partsQar: parts, familyQar, excessQar: familyQar < 0 ? -familyQar : 0 };
+}
+
+export type AllocationMode = "add" | "set";
+
+/**
+ * A pool's new QAR amount on a send after entering a PKR amount: "add" tops up
+ * the current amount, "set" replaces it. Adding works in whole rupees so that
+ * QAR rounding doesn't build up over repeated additions.
+ */
+export function nextPartQar(mode: AllocationMode, currentQar: number, pkr: number, rate: number): number {
+  if (mode === "set") return pkrToQar(pkr, rate);
+  return pkr ? pkrToQar(Math.round(qarToPkr(currentQar, rate)) + pkr, rate) : currentQar;
 }
 
 export type SendLike = {

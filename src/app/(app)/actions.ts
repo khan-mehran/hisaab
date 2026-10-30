@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getRate, RATE_CACHE_TAG } from "@/lib/rates/get-rate";
-import { pkrToQar, toQar } from "@/lib/currency";
+import { toQar } from "@/lib/currency";
+import { nextPartQar } from "@/lib/calc/pools";
 import { phoneToEmail, toE164 } from "@/lib/phone";
 import { DELETABLE, ENTITIES, type DeletableTable, type EntityInput, type EntityName } from "@/lib/entities";
 import { dbFail, fail, validationFail, type ActionResult } from "@/lib/action-result";
@@ -129,8 +130,9 @@ export async function saveSend(input: SendInput, id?: string): Promise<ActionRes
 }
 
 /**
- * Split a send into pools. Amounts arrive in PKR and are stored in QAR at the
- * send's locked rate. The database rejects parts above the send's amount.
+ * Add to a send's pools, or correct them. Amounts arrive in PKR and are stored
+ * in QAR at the send's locked rate. The database rejects parts above the
+ * send's amount.
  */
 export async function saveAllocation(input: AllocationInput): Promise<ActionResult> {
   const parsed = allocationSchema.safeParse(input);
@@ -139,23 +141,23 @@ export async function saveAllocation(input: AllocationInput): Promise<ActionResu
   const s = await session();
   if (!s) return fail(SESSION_EXPIRED);
 
-  const { send_id, charity_pkr, debt_pkr, installments_pkr, others_pkr } = parsed.data;
+  const { mode, send_id, charity_pkr, debt_pkr, installments_pkr, others_pkr } = parsed.data;
   const { data: send, error: loadError } = await s.supabase
     .from("sends")
-    .select("rate_qar_pkr")
+    .select("rate_qar_pkr, charity_qar, debt_qar, installments_qar, others_qar")
     .eq("id", send_id)
     .maybeSingle();
   if (loadError) return dbFail(loadError, "load send");
   if (!send) return fail("That entry no longer exists.");
 
-  const rate = Number(send.rate_qar_pkr);
+  const next = (current: number, pkr: number) => nextPartQar(mode, Number(current), pkr, Number(send.rate_qar_pkr));
   const { error } = await s.supabase
     .from("sends")
     .update({
-      charity_qar: pkrToQar(charity_pkr, rate),
-      debt_qar: pkrToQar(debt_pkr, rate),
-      installments_qar: pkrToQar(installments_pkr, rate),
-      others_qar: pkrToQar(others_pkr, rate),
+      charity_qar: next(send.charity_qar, charity_pkr),
+      debt_qar: next(send.debt_qar, debt_pkr),
+      installments_qar: next(send.installments_qar, installments_pkr),
+      others_qar: next(send.others_qar, others_pkr),
     })
     .eq("id", send_id);
   return error ? dbFail(error, "update allocation") : { ok: true };

@@ -10,9 +10,11 @@ import {
   PlusIcon,
   SendIcon,
   ShapesIcon,
+  SlidersHorizontalIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "@/components/app/page-header";
 import { StatCard } from "@/components/app/stat-card";
@@ -45,6 +47,7 @@ export function SentView() {
   const remove = useAction(deleteEntity, "Send deleted");
   const [open, setOpen] = useState(false);
   const [allocating, setAllocating] = useState(false);
+  const [correcting, setCorrecting] = useState<Tables<"sends"> | null>(null);
   const [editing, setEditing] = useState<Tables<"sends"> | null>(null);
 
   const totals = sendTotals(sends.data ?? []);
@@ -91,7 +94,14 @@ export function SentView() {
             <CardTitle>All sends</CardTitle>
             <CardDescription>Each send converts at the rate on the day it was sent.</CardDescription>
           </div>
-          <Button variant="outline" disabled={!sends.data?.length} onClick={() => setAllocating(true)}>
+          <Button
+            variant="outline"
+            disabled={!sends.data?.length}
+            onClick={() => {
+              setCorrecting(null);
+              setAllocating(true);
+            }}
+          >
             <PlusIcon /> Add allocation
           </Button>
         </CardHeader>
@@ -149,7 +159,16 @@ export function SentView() {
                         deleteTitle="Delete this send?"
                         deleteDescription="Its allocations will be removed from the pools and the balance."
                         onDelete={() => remove.mutateAsync(["sends", s.id]).then(() => true, () => false)}
-                      />
+                      >
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setCorrecting(s);
+                            setAllocating(true);
+                          }}
+                        >
+                          <SlidersHorizontalIcon /> Edit allocations
+                        </DropdownMenuItem>
+                      </RowActions>
                     </TableCell>
                   </TableRow>
                 );
@@ -199,6 +218,7 @@ export function SentView() {
         open={allocating}
         onOpenChange={setAllocating}
         sends={sends.data ?? []}
+        correcting={correcting}
         onSubmit={(values) => saveParts.mutateAsync([values]).then(() => true, () => false)}
       />
     </div>

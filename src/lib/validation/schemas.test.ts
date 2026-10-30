@@ -25,13 +25,14 @@ describe("allocationSchema", () => {
   const send_id = "6f1c1a8e-3c4b-4b8e-9a51-2f0c3f5d7a10";
 
   it("parses amounts and treats blanks as 0", () => {
-    const r = allocationSchema.parse({ send_id, charity_pkr: "10,000", debt_pkr: "" });
-    expect(r).toEqual({ send_id, charity_pkr: 10000, debt_pkr: 0, installments_pkr: 0, others_pkr: 0 });
+    const r = allocationSchema.parse({ mode: "add", send_id, charity_pkr: "10,000", debt_pkr: "" });
+    expect(r).toEqual({ mode: "add", send_id, charity_pkr: 10000, debt_pkr: 0, installments_pkr: 0, others_pkr: 0 });
   });
 
-  it("needs a send and rejects negative amounts", () => {
-    expect(allocationSchema.safeParse({ send_id: "1" }).success).toBe(false);
-    expect(allocationSchema.safeParse({ send_id, charity_pkr: "-5" }).success).toBe(false);
+  it("needs a mode and a send, and rejects negative amounts", () => {
+    expect(allocationSchema.safeParse({ send_id }).success).toBe(false);
+    expect(allocationSchema.safeParse({ mode: "add", send_id: "1" }).success).toBe(false);
+    expect(allocationSchema.safeParse({ mode: "add", send_id, charity_pkr: "-5" }).success).toBe(false);
   });
 });
 

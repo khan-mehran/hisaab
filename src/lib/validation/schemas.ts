@@ -96,8 +96,12 @@ export const sendSchema = z.object({
   bank,
 });
 
-/** How much of one send goes to each pool, in PKR; the rest is the family portion. */
+/**
+ * PKR amounts to add to a send's pools, or to set them to when correcting.
+ * What is left of the send is the family portion.
+ */
 export const allocationSchema = z.object({
+  mode: z.enum(["add", "set"]),
   send_id: z.uuid({ error: "Choose a send" }),
   charity_pkr: optionalAmount,
   debt_pkr: optionalAmount,

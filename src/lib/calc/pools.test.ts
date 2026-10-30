@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { exceedsPool, poolStatus, sendTotals, validateAllocation } from "./pools";
+import { exceedsPool, nextPartQar, poolStatus, sendTotals, validateAllocation } from "./pools";
+import { qarToPkr } from "@/lib/currency";
 
 const send = (over: Partial<Parameters<typeof sendTotals>[0][number]> = {}) => ({
   amount_qar: 1500,
@@ -35,6 +36,25 @@ describe("validateAllocation", () => {
 
   it("treats missing parts as 0", () => {
     expect(validateAllocation({ amount: 250 }).familyQar).toBe(250);
+  });
+});
+
+describe("nextPartQar", () => {
+  const rate = 76.005;
+
+  it("adds to the current amount without rounding building up", () => {
+    let qar = 0;
+    for (let i = 0; i < 3; i++) qar = nextPartQar("add", qar, 10000, rate);
+    expect(Math.round(qarToPkr(qar, rate))).toBe(30000);
+  });
+
+  it("leaves the amount untouched when nothing is added", () => {
+    expect(nextPartQar("add", 131.55, 0, rate)).toBe(131.55);
+  });
+
+  it("replaces the amount when correcting, and blank clears it", () => {
+    expect(nextPartQar("set", 500, 10000, rate)).toBe(131.57);
+    expect(nextPartQar("set", 500, 0, rate)).toBe(0);
   });
 });
 
