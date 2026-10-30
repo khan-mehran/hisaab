@@ -22,7 +22,7 @@ export function MoneyInput({ currency, invalid, className, onChange, ...props }:
         autoComplete="off"
         placeholder="0"
         aria-invalid={invalid || undefined}
-        className={cn("h-10 pl-12 text-right num", className)}
+        className={cn("h-10 pl-12 num", className)}
         onChange={(e) => {
           // Allow digits, one dot and grouping commas only.
           e.target.value = e.target.value.replace(/[^\d.,]/g, "").replace(/(\..*)\./g, "$1");

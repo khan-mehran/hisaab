@@ -24,13 +24,17 @@ export function qarToPkr(qar: number, qarPkr: number): number {
   return round2(qar * qarPkr);
 }
 
+export function pkrToQar(pkr: number, qarPkr: number): number {
+  return round2(pkr / qarPkr);
+}
+
 /** Convert any supported currency to QAR. */
 export function toQar(amount: number, currency: Currency, rates: Rates): number {
   switch (currency) {
     case "QAR":
       return round2(amount);
     case "PKR":
-      return round2(amount / rates.qarPkr);
+      return pkrToQar(amount, rates.qarPkr);
     case "USD":
       return round2(amount * rates.usdQar);
   }

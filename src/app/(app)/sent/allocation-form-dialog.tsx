@@ -13,15 +13,15 @@ import { num } from "./send-form-dialog";
 import { useMoney } from "@/lib/queries";
 import { allocationSchema, type AllocationInput } from "@/lib/validation/schemas";
 import { validateAllocation } from "@/lib/calc/pools";
-import { qarToPkr } from "@/lib/currency";
+import { pkrToQar, qarToPkr } from "@/lib/currency";
 import { formatDate } from "@/lib/dates";
 import type { Tables } from "@/lib/database.types";
 
 const PARTS = [
-  { name: "charity_qar", label: "Charity" },
-  { name: "debt_qar", label: "Debt" },
-  { name: "installments_qar", label: "Installments" },
-  { name: "others_qar", label: "Others" },
+  { name: "charity_pkr", label: "Charity" },
+  { name: "debt_pkr", label: "Debt" },
+  { name: "installments_pkr", label: "Installments" },
+  { name: "others_pkr", label: "Others" },
 ] as const;
 
 type Props = {
@@ -32,14 +32,18 @@ type Props = {
   onSubmit: (values: AllocationInput) => Promise<boolean>;
 };
 
-const blank = (n: number) => (Number(n) ? String(Number(n)) : "");
+/** Whole rupees, matching how PKR is displayed; QAR's 2 decimals can't hold more. */
+const toRupees = (qar: number, rate: number) => {
+  const pkr = Math.round(qarToPkr(Number(qar), Number(rate)));
+  return pkr ? String(pkr) : "";
+};
 
 const toForm = (s: Tables<"sends"> | undefined): AllocationInput => ({
   send_id: s?.id ?? "",
-  charity_qar: blank(s?.charity_qar ?? 0),
-  debt_qar: blank(s?.debt_qar ?? 0),
-  installments_qar: blank(s?.installments_qar ?? 0),
-  others_qar: blank(s?.others_qar ?? 0),
+  charity_pkr: s ? toRupees(s.charity_qar, s.rate_qar_pkr) : "",
+  debt_pkr: s ? toRupees(s.debt_qar, s.rate_qar_pkr) : "",
+  installments_pkr: s ? toRupees(s.installments_qar, s.rate_qar_pkr) : "",
+  others_pkr: s ? toRupees(s.others_qar, s.rate_qar_pkr) : "",
 });
 
 /** Split a send into pools; what is left of its amount is the family portion. */
@@ -58,14 +62,16 @@ export function AllocationFormDialog({ open, onOpenChange, sends, onSubmit }: Pr
   }, [open]);
 
   const send = sends.find((s) => s.id === v.send_id);
+  const rate = Number(send?.rate_qar_pkr ?? 0);
+  const qar = (pkrValue: unknown) => (rate ? pkrToQar(num(pkrValue), rate) : 0);
   const check = validateAllocation({
     amount: Number(send?.amount_qar ?? 0),
-    charity: num(v.charity_qar),
-    debt: num(v.debt_qar),
-    installments: num(v.installments_qar),
-    others: num(v.others_qar),
+    charity: qar(v.charity_pkr),
+    debt: qar(v.debt_pkr),
+    installments: qar(v.installments_pkr),
+    others: qar(v.others_pkr),
   });
-  const pkr = (qar: number) => (send ? money.pkr(qarToPkr(qar, Number(send.rate_qar_pkr))) : "—");
+  const pkr = (qarValue: number) => (send ? money.pkr(qarToPkr(qarValue, rate)) : "—");
 
   return (
     <Dialog open={open} onOpenChange={(next) => !isSubmitting && onOpenChange(next)}>
@@ -95,7 +101,7 @@ export function AllocationFormDialog({ open, onOpenChange, sends, onSubmit }: Pr
                   placeholder="Choose send"
                   options={sends.map((s) => ({
                     value: s.id,
-                    label: `${formatDate(s.sent_date)} · ${money.qar(Number(s.amount_qar))}`,
+                    label: `${formatDate(s.sent_date)} · ${money.pkr(qarToPkr(Number(s.amount_qar), Number(s.rate_qar_pkr)))}`,
                     hint: s.bank,
                   }))}
                 />
@@ -106,8 +112,8 @@ export function AllocationFormDialog({ open, onOpenChange, sends, onSubmit }: Pr
           <div className="grid grid-cols-2 gap-3">
             {PARTS.map((p) => (
               <Field key={p.name} label={p.label} htmlFor={p.name} error={errors[p.name]?.message}>
-                <MoneyInput id={p.name} currency="QAR" invalid={!!errors[p.name]} {...register(p.name)} />
-                {num(v[p.name]) > 0 && <p className="text-xs text-muted-foreground num">{pkr(num(v[p.name]))}</p>}
+                <MoneyInput id={p.name} currency="PKR" invalid={!!errors[p.name]} {...register(p.name)} />
+                {num(v[p.name]) > 0 && <p className="text-xs text-muted-foreground num">{money.qar(qar(v[p.name]))}</p>}
               </Field>
             ))}
           </div>
@@ -124,7 +130,7 @@ export function AllocationFormDialog({ open, onOpenChange, sends, onSubmit }: Pr
             ) : (
               <p className="flex items-center gap-2 text-sm">
                 <TriangleAlertIcon className="size-4 shrink-0" />
-                Allocations are {money.qar(check.excessQar)} more than the amount sent.
+                Allocations are {pkr(check.excessQar)} more than the amount sent.
               </p>
             )}
           </div>

@@ -96,13 +96,13 @@ export const sendSchema = z.object({
   bank,
 });
 
-/** How much of one send goes to each pool; the rest is the family portion. */
+/** How much of one send goes to each pool, in PKR; the rest is the family portion. */
 export const allocationSchema = z.object({
   send_id: z.uuid({ error: "Choose a send" }),
-  charity_qar: optionalAmount,
-  debt_qar: optionalAmount,
-  installments_qar: optionalAmount,
-  others_qar: optionalAmount,
+  charity_pkr: optionalAmount,
+  debt_pkr: optionalAmount,
+  installments_pkr: optionalAmount,
+  others_pkr: optionalAmount,
 });
 
 export const familyTransferSchema = z.object({

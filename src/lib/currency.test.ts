@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatMoney, parseAmount, qarToPkr, round2, toPkr, toQar } from "./currency";
+import { formatMoney, parseAmount, pkrToQar, qarToPkr, round2, toPkr, toQar } from "./currency";
 
 const rates = { qarPkr: 77.4, usdQar: 3.64 };
 
@@ -39,6 +39,15 @@ describe("conversions", () => {
 
   it("round2 handles float noise", () => {
     expect(round2(0.1 + 0.2)).toBe(0.3);
+  });
+});
+
+describe("pkrToQar", () => {
+  it("rounds to 2 decimals, but a typed PKR amount still displays unchanged", () => {
+    const qar = pkrToQar(10000, 76.005);
+    expect(qar).toBe(131.57);
+    expect(qarToPkr(qar, 76.005)).toBe(9999.98);
+    expect(formatMoney(qarToPkr(qar, 76.005), "PKR")).toBe("Rs 10,000");
   });
 });
 

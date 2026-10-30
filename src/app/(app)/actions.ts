@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getRate, RATE_CACHE_TAG } from "@/lib/rates/get-rate";
-import { toQar } from "@/lib/currency";
+import { pkrToQar, toQar } from "@/lib/currency";
 import { phoneToEmail, toE164 } from "@/lib/phone";
 import { DELETABLE, ENTITIES, type DeletableTable, type EntityInput, type EntityName } from "@/lib/entities";
 import { dbFail, fail, validationFail, type ActionResult } from "@/lib/action-result";
@@ -128,7 +128,10 @@ export async function saveSend(input: SendInput, id?: string): Promise<ActionRes
   return error ? dbFail(error, "insert send") : { ok: true };
 }
 
-/** Split a send into pools. The database rejects parts above the send's amount. */
+/**
+ * Split a send into pools. Amounts arrive in PKR and are stored in QAR at the
+ * send's locked rate. The database rejects parts above the send's amount.
+ */
 export async function saveAllocation(input: AllocationInput): Promise<ActionResult> {
   const parsed = allocationSchema.safeParse(input);
   if (!parsed.success) return validationFail(parsed.error);
@@ -136,8 +139,25 @@ export async function saveAllocation(input: AllocationInput): Promise<ActionResu
   const s = await session();
   if (!s) return fail(SESSION_EXPIRED);
 
-  const { send_id, ...parts } = parsed.data;
-  const { error } = await s.supabase.from("sends").update(parts).eq("id", send_id);
+  const { send_id, charity_pkr, debt_pkr, installments_pkr, others_pkr } = parsed.data;
+  const { data: send, error: loadError } = await s.supabase
+    .from("sends")
+    .select("rate_qar_pkr")
+    .eq("id", send_id)
+    .maybeSingle();
+  if (loadError) return dbFail(loadError, "load send");
+  if (!send) return fail("That entry no longer exists.");
+
+  const rate = Number(send.rate_qar_pkr);
+  const { error } = await s.supabase
+    .from("sends")
+    .update({
+      charity_qar: pkrToQar(charity_pkr, rate),
+      debt_qar: pkrToQar(debt_pkr, rate),
+      installments_qar: pkrToQar(installments_pkr, rate),
+      others_qar: pkrToQar(others_pkr, rate),
+    })
+    .eq("id", send_id);
   return error ? dbFail(error, "update allocation") : { ok: true };
 }
 
