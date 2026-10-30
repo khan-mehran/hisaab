@@ -10,6 +10,7 @@ import { phoneToEmail, toE164 } from "@/lib/phone";
 import { DELETABLE, ENTITIES, type DeletableTable, type EntityInput, type EntityName } from "@/lib/entities";
 import { dbFail, fail, validationFail, type ActionResult } from "@/lib/action-result";
 import {
+  allocationSchema,
   debtCreateSchema,
   debtUpdateSchema,
   incomeSchema,
@@ -17,6 +18,7 @@ import {
   personName,
   sendSchema,
   settingsSchema,
+  type AllocationInput,
   type DebtCreateInput,
   type DebtUpdateInput,
   type IncomeInput,
@@ -124,6 +126,19 @@ export async function saveSend(input: SendInput, id?: string): Promise<ActionRes
     .from("sends")
     .insert({ ...parsed.data, rate_qar_pkr: rate.qarPkr });
   return error ? dbFail(error, "insert send") : { ok: true };
+}
+
+/** Split a send into pools. The database rejects parts above the send's amount. */
+export async function saveAllocation(input: AllocationInput): Promise<ActionResult> {
+  const parsed = allocationSchema.safeParse(input);
+  if (!parsed.success) return validationFail(parsed.error);
+
+  const s = await session();
+  if (!s) return fail(SESSION_EXPIRED);
+
+  const { send_id, ...parts } = parsed.data;
+  const { error } = await s.supabase.from("sends").update(parts).eq("id", send_id);
+  return error ? dbFail(error, "update allocation") : { ok: true };
 }
 
 // ---------------------------------------------------------------------------

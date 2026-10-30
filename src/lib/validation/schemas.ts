@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { CURRENCIES, parseAmount } from "@/lib/currency";
 import { ISO_DATE, ISO_MONTH } from "@/lib/dates";
-import { validateAllocation } from "@/lib/calc/pools";
 
 /**
  * Entity schemas shared by client forms and server actions. Form inputs are
@@ -91,32 +90,20 @@ export const expenseSchema = z
     date_to: d.period === "weekly" ? d.date_to! : null,
   }));
 
-export const sendSchema = z
-  .object({
-    sent_date: isoDate,
-    amount_qar: amount,
-    charity_qar: optionalAmount,
-    debt_qar: optionalAmount,
-    installments_qar: optionalAmount,
-    others_qar: optionalAmount,
-    bank,
-  })
-  .superRefine((d, ctx) => {
-    const check = validateAllocation({
-      amount: d.amount_qar,
-      charity: d.charity_qar,
-      debt: d.debt_qar,
-      installments: d.installments_qar,
-      others: d.others_qar,
-    });
-    if (!check.ok) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["amount_qar"],
-        message: `Parts are QAR ${check.excessQar} more than the amount sent`,
-      });
-    }
-  });
+export const sendSchema = z.object({
+  sent_date: isoDate,
+  amount_qar: amount,
+  bank,
+});
+
+/** How much of one send goes to each pool; the rest is the family portion. */
+export const allocationSchema = z.object({
+  send_id: z.uuid({ error: "Choose a send" }),
+  charity_qar: optionalAmount,
+  debt_qar: optionalAmount,
+  installments_qar: optionalAmount,
+  others_qar: optionalAmount,
+});
 
 export const familyTransferSchema = z.object({
   transfer_date: isoDate,
@@ -206,6 +193,7 @@ export type ExpenseInput = z.input<typeof expenseSchema>;
 export type DebtCreateInput = z.input<typeof debtCreateSchema>;
 export type DebtUpdateInput = z.input<typeof debtUpdateSchema>;
 export type SendInput = z.input<typeof sendSchema>;
+export type AllocationInput = z.input<typeof allocationSchema>;
 export type OtherBatchInput = z.input<typeof otherBatchSchema>;
 export type IncomeInput = z.input<typeof incomeSchema>;
 export type SettingsInput = z.input<typeof settingsSchema>;

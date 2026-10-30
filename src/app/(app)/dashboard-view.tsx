@@ -18,7 +18,7 @@ import { AmountStack } from "@/components/app/amount";
 import { MonthPicker, useSelectedMonth } from "@/components/app/month-context";
 import { RateNote } from "@/components/app/rate-note";
 import { useIncomes, useMoney, useMonthlyTotals, useProfile, useRate } from "@/lib/queries";
-import { computeBalance, EMPTY_TOTALS, salaryForMonth, type MonthTotals } from "@/lib/calc/balance";
+import { computeBalance, computeZakat, EMPTY_TOTALS, salaryForMonth, type MonthTotals } from "@/lib/calc/balance";
 import { qarToPkr } from "@/lib/currency";
 import { monthLabel, shortMonthLabel } from "@/lib/dates";
 
@@ -44,6 +44,7 @@ export function DashboardView() {
       }
     : EMPTY_TOTALS;
   const balance = computeBalance(salaryQar, totals);
+  const zakatQar = computeZakat(salaryQar ?? 0);
 
   // Live rate for PKR equivalents; fall back to the rate saved with the salary.
   const qarPkr = rate?.qarPkr ?? (income ? Number(income.rate_qar_pkr) : null);
@@ -95,7 +96,15 @@ export function DashboardView() {
                 : undefined
           }
         >
-          <AmountStack size="lg" primary={salaryQar ?? 0} primaryCurrency="QAR" secondary={pkr(salaryQar ?? 0)} secondaryCurrency="PKR" />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <AmountStack size="lg" primary={salaryQar ?? 0} primaryCurrency="QAR" secondary={pkr(salaryQar ?? 0)} secondaryCurrency="PKR" />
+            {zakatQar > 0 && (
+              <div className="rounded-lg bg-white/10 px-4 py-2 ring-1 ring-white/15">
+                <p className="mb-1 text-xs text-primary-foreground/75">Zakat (2.5%)</p>
+                <AmountStack size="sm" primary={zakatQar} primaryCurrency="QAR" secondary={pkr(zakatQar)} secondaryCurrency="PKR" />
+              </div>
+            )}
+          </div>
         </StatCard>
         <StatCard
           title="Balance"

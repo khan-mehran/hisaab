@@ -25,6 +25,11 @@ export function computeBalance(salaryQar: number | null, totals: MonthTotals): n
   );
 }
 
+/** Zakat is 2.5% of the salary. Informational: not deducted from the balance. */
+export function computeZakat(salaryQar: number): number {
+  return round2(salaryQar * 0.025);
+}
+
 /**
  * Salary for a month: the most recent income saved for that month or any
  * earlier month, so a salary keeps applying until it is changed.

@@ -21,9 +21,10 @@ import { RowActions } from "@/components/app/row-actions";
 import { RateNote } from "@/components/app/rate-note";
 import { TableEmpty, TableError, TableSkeleton } from "@/components/app/table-states";
 import { EntityFormDialog } from "@/components/form/entity-form-dialog";
+import { AllocationFormDialog } from "./allocation-form-dialog";
 import { SendFormDialog } from "./send-form-dialog";
 import { useAction, useFamilyPortion, useFamilyTransfers, useMoney, useSends } from "@/lib/queries";
-import { deleteEntity, saveEntity, saveSend } from "../actions";
+import { deleteEntity, saveAllocation, saveEntity, saveSend } from "../actions";
 import { familyTransferSchema, RELATIONS, type SendInput } from "@/lib/validation/schemas";
 import { sendTotals, validateAllocation } from "@/lib/calc/pools";
 import { qarToPkr, round2 } from "@/lib/currency";
@@ -34,20 +35,16 @@ import { cn } from "@/lib/utils";
 const EMPTY_SEND: SendInput = {
   sent_date: "",
   amount_qar: "",
-  charity_qar: "",
-  debt_qar: "",
-  installments_qar: "",
-  others_qar: "",
   bank: undefined as unknown as SendInput["bank"],
 };
-
-const blank = (n: number) => (Number(n) ? String(Number(n)) : "");
 
 export function SentView() {
   const sends = useSends();
   const save = useAction(saveSend);
+  const saveParts = useAction(saveAllocation, "Allocation saved");
   const remove = useAction(deleteEntity, "Send deleted");
   const [open, setOpen] = useState(false);
+  const [allocating, setAllocating] = useState(false);
   const [editing, setEditing] = useState<Tables<"sends"> | null>(null);
 
   const totals = sendTotals(sends.data ?? []);
@@ -89,9 +86,14 @@ export function SentView() {
       </div>
 
       <Card className="gap-0 py-0">
-        <CardHeader className="border-b py-4">
-          <CardTitle>All sends</CardTitle>
-          <CardDescription>Each send converts at the rate on the day it was sent.</CardDescription>
+        <CardHeader className="flex flex-col gap-3 border-b py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle>All sends</CardTitle>
+            <CardDescription>Each send converts at the rate on the day it was sent.</CardDescription>
+          </div>
+          <Button variant="outline" disabled={!sends.data?.length} onClick={() => setAllocating(true)}>
+            <PlusIcon /> Add allocation
+          </Button>
         </CardHeader>
         <Table>
           <TableHeader>
@@ -181,10 +183,6 @@ export function SentView() {
             ? {
                 sent_date: editing.sent_date,
                 amount_qar: String(Number(editing.amount_qar)),
-                charity_qar: blank(editing.charity_qar),
-                debt_qar: blank(editing.debt_qar),
-                installments_qar: blank(editing.installments_qar),
-                others_qar: blank(editing.others_qar),
                 bank: editing.bank,
               }
             : { ...EMPTY_SEND, sent_date: todayISO() }
@@ -195,6 +193,13 @@ export function SentView() {
             return true;
           }, () => false)
         }
+      />
+
+      <AllocationFormDialog
+        open={allocating}
+        onOpenChange={setAllocating}
+        sends={sends.data ?? []}
+        onSubmit={(values) => saveParts.mutateAsync([values]).then(() => true, () => false)}
       />
     </div>
   );

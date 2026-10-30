@@ -17,13 +17,6 @@ import { parseAmount, qarToPkr } from "@/lib/currency";
 import { formatDate } from "@/lib/dates";
 import type { Tables } from "@/lib/database.types";
 
-const PARTS = [
-  { name: "charity_qar", label: "Charity" },
-  { name: "debt_qar", label: "Debt" },
-  { name: "installments_qar", label: "Installments" },
-  { name: "others_qar", label: "Others" },
-] as const;
-
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -33,12 +26,12 @@ type Props = {
   onSubmit: (values: SendInput) => Promise<boolean>;
 };
 
-const num = (v: unknown) => {
+export const num = (v: unknown) => {
   const n = parseAmount(v as string);
   return Number.isFinite(n) ? n : 0;
 };
 
-/** Add/edit a send with live PKR conversion and the family remainder. */
+/** Add/edit a send with live PKR conversion. Allocations have their own dialog. */
 export function SendFormDialog({ open, onOpenChange, editing, defaultValues, onSubmit }: Props) {
   const { data: liveRate } = useRate();
   const money = useMoney();
@@ -56,12 +49,13 @@ export function SendFormDialog({ open, onOpenChange, editing, defaultValues, onS
   }, [open]);
 
   const amount = num(v.amount_qar);
+  // An edited send can't go below what is already allocated from it.
   const check = validateAllocation({
     amount,
-    charity: num(v.charity_qar),
-    debt: num(v.debt_qar),
-    installments: num(v.installments_qar),
-    others: num(v.others_qar),
+    charity: Number(editing?.charity_qar ?? 0),
+    debt: Number(editing?.debt_qar ?? 0),
+    installments: Number(editing?.installments_qar ?? 0),
+    others: Number(editing?.others_qar ?? 0),
   });
   const pkr = (qar: number) => (rate ? money.pkr(qarToPkr(qar, rate)) : "—");
 
@@ -119,35 +113,11 @@ export function SendFormDialog({ open, onOpenChange, editing, defaultValues, onS
             )}
           </Field>
 
-          <fieldset className="grid gap-3 rounded-xl border p-3">
-            <legend className="px-1 text-xs font-medium text-muted-foreground">Allocations (optional, QAR)</legend>
-            <div className="grid grid-cols-2 gap-3">
-              {PARTS.map((p) => (
-                <Field key={p.name} label={p.label} htmlFor={p.name} error={errors[p.name]?.message}>
-                  <MoneyInput id={p.name} currency="QAR" invalid={!!errors[p.name]} {...register(p.name)} />
-                  {num(v[p.name]) > 0 && <p className="text-xs text-muted-foreground num">{pkr(num(v[p.name]))}</p>}
-                </Field>
-              ))}
-            </div>
-          </fieldset>
-
-          {amount > 0 && (
-            <div className={check.ok ? "rounded-lg bg-muted px-3 py-2.5" : "rounded-lg bg-destructive/10 px-3 py-2.5 text-destructive"}>
-              {check.ok ? (
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-sm text-muted-foreground">Family portion</span>
-                  <span className="text-right">
-                    <span className="block font-semibold num">{pkr(check.familyQar)}</span>
-                    <span className="block text-xs text-muted-foreground num">{money.qar(check.familyQar)}</span>
-                  </span>
-                </div>
-              ) : (
-                <p className="flex items-center gap-2 text-sm">
-                  <TriangleAlertIcon className="size-4 shrink-0" />
-                  Allocations are {money.qar(check.excessQar)} more than the amount sent.
-                </p>
-              )}
-            </div>
+          {!check.ok && (
+            <p className="flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
+              <TriangleAlertIcon className="size-4 shrink-0" />
+              {money.qar(check.partsQar)} is already allocated from this send. Lower the allocations first.
+            </p>
           )}
 
           <DialogFooter>

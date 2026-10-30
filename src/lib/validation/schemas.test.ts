@@ -1,24 +1,37 @@
 import { describe, expect, it } from "vitest";
-import { debtCreateSchema, debtPaymentSchema, expenseSchema, otherBatchSchema, sendSchema } from "./schemas";
+import { allocationSchema, debtCreateSchema, debtPaymentSchema, expenseSchema, otherBatchSchema, sendSchema } from "./schemas";
 import { signupSchema } from "./auth";
 import { phoneToEmail, sanitizeLocalInput, toE164 } from "@/lib/phone";
 
 describe("sendSchema", () => {
-  const base = { sent_date: "2026-10-05", amount_qar: "1500", charity_qar: "200", debt_qar: "300", bank: "HBL" };
+  const base = { sent_date: "2026-10-05", amount_qar: "1500", bank: "HBL" };
 
-  it("accepts a valid send and parses amounts", () => {
-    const r = sendSchema.parse(base);
-    expect(r).toMatchObject({ amount_qar: 1500, charity_qar: 200, debt_qar: 300, installments_qar: 0, others_qar: 0 });
+  it("accepts a valid send and parses the amount", () => {
+    expect(sendSchema.parse(base)).toEqual({ sent_date: "2026-10-05", amount_qar: 1500, bank: "HBL" });
   });
 
-  it("rejects parts larger than the amount", () => {
-    expect(sendSchema.safeParse({ ...base, amount_qar: "400" }).success).toBe(false);
+  it("ignores allocations, so editing a send keeps them", () => {
+    expect(sendSchema.parse({ ...base, charity_qar: "200" })).not.toHaveProperty("charity_qar");
   });
 
   it("requires a positive amount and a known bank", () => {
     expect(sendSchema.safeParse({ ...base, amount_qar: "0" }).success).toBe(false);
     expect(sendSchema.safeParse({ ...base, amount_qar: "-5" }).success).toBe(false);
     expect(sendSchema.safeParse({ ...base, bank: "XYZ" }).success).toBe(false);
+  });
+});
+
+describe("allocationSchema", () => {
+  const send_id = "6f1c1a8e-3c4b-4b8e-9a51-2f0c3f5d7a10";
+
+  it("parses amounts and treats blanks as 0", () => {
+    const r = allocationSchema.parse({ send_id, charity_qar: "200", debt_qar: "" });
+    expect(r).toEqual({ send_id, charity_qar: 200, debt_qar: 0, installments_qar: 0, others_qar: 0 });
+  });
+
+  it("needs a send and rejects negative amounts", () => {
+    expect(allocationSchema.safeParse({ send_id: "1" }).success).toBe(false);
+    expect(allocationSchema.safeParse({ send_id, charity_qar: "-5" }).success).toBe(false);
   });
 });
 

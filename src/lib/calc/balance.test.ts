@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeBalance, EMPTY_TOTALS, salaryForMonth } from "./balance";
+import { computeBalance, computeZakat, EMPTY_TOTALS, salaryForMonth } from "./balance";
 
 describe("computeBalance", () => {
   it("is 0 before any salary is saved, even with spending", () => {
@@ -25,6 +25,16 @@ describe("computeBalance", () => {
 
   it("avoids floating point drift", () => {
     expect(computeBalance(0.3, { ...EMPTY_TOTALS, expensesQar: 0.1, sentQar: 0.2 })).toBe(0);
+  });
+});
+
+describe("computeZakat", () => {
+  it("is 2.5% of the salary", () => {
+    expect(computeZakat(10000)).toBe(250);
+  });
+
+  it("rounds to 2 decimals", () => {
+    expect(computeZakat(12345.67)).toBe(308.64);
   });
 });
 
