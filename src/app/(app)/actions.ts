@@ -10,6 +10,7 @@ import { nextPartQar } from "@/lib/calc/pools";
 import { phoneToEmail, toE164 } from "@/lib/phone";
 import { DELETABLE, ENTITIES, type DeletableTable, type EntityInput, type EntityName } from "@/lib/entities";
 import { dbFail, fail, validationFail, type ActionResult } from "@/lib/action-result";
+import { isHistorySection, type HistorySection } from "@/lib/history";
 import {
   allocationSchema,
   debtCreateSchema,
@@ -393,6 +394,31 @@ export async function updateSettings(input: SettingsInput): Promise<ActionResult
 
   const { error } = await s.supabase.from("profiles").update(parsed.data).eq("id", s.userId);
   return error ? dbFail(error, "update settings") : { ok: true };
+}
+
+/**
+ * "Clear month": everything recorded on a page up to now moves to its History.
+ * Only a timestamp is stored; no entries are changed or deleted.
+ */
+export async function clearSection(section: HistorySection): Promise<ActionResult> {
+  if (!isHistorySection(section)) return fail("Unknown page.");
+
+  const s = await session();
+  if (!s) return fail(SESSION_EXPIRED);
+
+  const { data: profile, error: loadError } = await s.supabase
+    .from("profiles")
+    .select("history_cleared_at")
+    .eq("id", s.userId)
+    .maybeSingle();
+  if (loadError) return dbFail(loadError, "load history markers");
+  if (!profile) return fail(SESSION_EXPIRED);
+
+  const { error } = await s.supabase
+    .from("profiles")
+    .update({ history_cleared_at: { ...profile.history_cleared_at, [section]: new Date().toISOString() } })
+    .eq("id", s.userId);
+  return error ? dbFail(error, "clear section") : { ok: true };
 }
 
 /** Drop the cached provider rate so the next /api/rate call fetches a fresh one. */

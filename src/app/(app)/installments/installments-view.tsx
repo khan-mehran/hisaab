@@ -11,6 +11,7 @@ export function InstallmentsView() {
     <PoolLedger
       pool="installments"
       entity="installments"
+      history="installments"
       title="Installments"
       description="Installments paid from the amount you allocated on the Sent page."
       icon={CreditCardIcon}

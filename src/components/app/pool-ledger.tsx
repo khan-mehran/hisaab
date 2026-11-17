@@ -10,24 +10,28 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "./page-header";
+import { HistoryButtons } from "./history-button";
 import { PoolCard } from "./pool-card";
 import { PoolWarning, usePool } from "./pool-warning";
 import { Money } from "./amount";
 import { RowActions } from "./row-actions";
 import { TableEmpty, TableError, TableSkeleton } from "./table-states";
 import { EntityFormDialog, type FieldDef } from "@/components/form/entity-form-dialog";
-import { useAction } from "@/lib/queries";
+import { useAction, useClearedAt } from "@/lib/queries";
 import { deleteEntity, saveEntity } from "@/app/(app)/actions";
 import type { PoolKey } from "@/lib/calc/pools";
 import { parseAmount, round2 } from "@/lib/currency";
+import { isCleared, type HistorySection } from "@/lib/history";
 
-type Row = { id: string; amount_pkr: number };
+type Row = { id: string; amount_pkr: number; created_at: string };
 
 export type Column<R> = { header: string; className?: string; cell: (row: R) => React.ReactNode };
 
 type Props<R extends Row, V extends Record<string, unknown>> = {
   pool: PoolKey;
   entity: "charity_entries" | "installments";
+  /** Where earlier months of this page are listed. */
+  history: HistorySection;
   title: string;
   description: string;
   icon: LucideIcon;
@@ -50,6 +54,7 @@ type Props<R extends Row, V extends Record<string, unknown>> = {
 export function PoolLedger<R extends Row, V extends Record<string, unknown>>({
   pool,
   entity,
+  history,
   title,
   description,
   icon,
@@ -68,7 +73,9 @@ export function PoolLedger<R extends Row, V extends Record<string, unknown>>({
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<R | null>(null);
 
-  const rows = query.data ?? [];
+  // Entries cleared with "Clear month" live under History.
+  const clearedAt = useClearedAt(history);
+  const rows = (query.data ?? []).filter((r) => !isCleared(r.created_at, clearedAt));
   const total = round2(rows.reduce((s, r) => s + Number(r.amount_pkr), 0));
   const cols = columns.length + trailingColumns.length + 2;
 
@@ -78,14 +85,17 @@ export function PoolLedger<R extends Row, V extends Record<string, unknown>>({
         title={title}
         description={description}
         actions={
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setOpen(true);
-            }}
-          >
-            <PlusIcon /> Add
-          </Button>
+          <>
+            <HistoryButtons section={history} canClear={rows.length > 0} />
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setOpen(true);
+              }}
+            >
+              <PlusIcon /> Add
+            </Button>
+          </>
         }
       />
 

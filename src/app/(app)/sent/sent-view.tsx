@@ -25,12 +25,14 @@ import { TableEmpty, TableError, TableSkeleton } from "@/components/app/table-st
 import { EntityFormDialog } from "@/components/form/entity-form-dialog";
 import { AllocationFormDialog } from "./allocation-form-dialog";
 import { SendFormDialog } from "./send-form-dialog";
-import { useAction, useFamilyPortion, useFamilyTransfers, useMoney, useSends } from "@/lib/queries";
+import { useAction, useClearedAt, useFamilyPortion, useFamilyTransfers, useMoney, useSends } from "@/lib/queries";
 import { deleteEntity, saveAllocation, saveEntity, saveSend } from "../actions";
 import { familyTransferSchema, RELATIONS, type SendInput } from "@/lib/validation/schemas";
 import { sendTotals, validateAllocation } from "@/lib/calc/pools";
 import { qarToPkr, round2 } from "@/lib/currency";
 import { formatDate, todayISO } from "@/lib/dates";
+import { isCleared } from "@/lib/history";
+import { HistoryButtons } from "@/components/app/history-button";
 import type { Tables } from "@/lib/database.types";
 import { cn } from "@/lib/utils";
 
@@ -51,7 +53,10 @@ export function SentView() {
   const [correcting, setCorrecting] = useState<Tables<"sends"> | null>(null);
   const [editing, setEditing] = useState<Tables<"sends"> | null>(null);
 
-  const totals = sendTotals(sends.data ?? []);
+  // Sends cleared with "Clear month" live under History.
+  const clearedAt = useClearedAt("sent");
+  const rows = (sends.data ?? []).filter((s) => !isCleared(s.created_at, clearedAt));
+  const totals = sendTotals(rows);
   const loading = sends.isLoading;
 
   const cards = [
@@ -70,14 +75,17 @@ export function SentView() {
         title="Sent"
         description="Money sent home, split into charity, debt, installments, others and family."
         actions={
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setOpen(true);
-            }}
-          >
-            <PlusIcon /> Add send
-          </Button>
+          <>
+            <HistoryButtons section="sent" />
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setOpen(true);
+              }}
+            >
+              <PlusIcon /> Add send
+            </Button>
+          </>
         }
       />
 
@@ -92,7 +100,7 @@ export function SentView() {
       <Card className="gap-0 py-0">
         <CardHeader className="flex flex-col gap-3 border-b py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle>All sends</CardTitle>
+            <CardTitle>Sends</CardTitle>
             <CardDescription>Each send converts at the rate on the day it was sent.</CardDescription>
           </div>
           <Button
@@ -125,10 +133,10 @@ export function SentView() {
               <TableSkeleton columns={COLS} />
             ) : sends.error ? (
               <TableError columns={COLS} message={sends.error.message} />
-            ) : !sends.data?.length ? (
+            ) : !rows.length ? (
               <TableEmpty columns={COLS} icon={SendIcon} title="No sends yet" description="Tap Add send to record money you sent home." />
             ) : (
-              sends.data.map((s) => {
+              rows.map((s) => {
                 const rate = Number(s.rate_qar_pkr);
                 const family = validateAllocation({
                   amount: Number(s.amount_qar),
@@ -176,7 +184,7 @@ export function SentView() {
               })
             )}
           </TableBody>
-          {!!sends.data?.length && (
+          {!!rows.length && (
             <TableFooter>
               <TableRow>
                 <TableCell className="font-semibold">Total</TableCell>
@@ -237,10 +245,15 @@ function FamilySection() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Tables<"family_transfers"> | null>(null);
 
-  const rows = transfers.data ?? [];
+  // The family portion carries over, so the figures count every entry; the
+  // table lists only those not yet cleared to History.
+  const clearedAt = useClearedAt("sent");
+  const all = transfers.data ?? [];
+  const rows = all.filter((t) => !isCleared(t.created_at, clearedAt));
   const byRelation = Object.fromEntries(RELATIONS.map((r) => [r, 0])) as Record<(typeof RELATIONS)[number], number>;
-  for (const t of rows) byRelation[t.relation] = round2(byRelation[t.relation] + Number(t.amount_pkr));
-  const allocated = round2(rows.reduce((s, t) => s + Number(t.amount_pkr), 0));
+  for (const t of all) byRelation[t.relation] = round2(byRelation[t.relation] + Number(t.amount_pkr));
+  const allocated = round2(all.reduce((s, t) => s + Number(t.amount_pkr), 0));
+  const monthTotal = round2(rows.reduce((s, t) => s + Number(t.amount_pkr), 0));
   const portionPkr = Number(portion.data?.portion_pkr ?? 0);
   const unallocated = round2(portionPkr - allocated);
   const COLS = 4;
@@ -322,7 +335,7 @@ function FamilySection() {
           <TableFooter>
             <TableRow>
               <TableCell colSpan={2} className="font-semibold">Total</TableCell>
-              <TableCell className="text-right font-semibold"><Money value={allocated} currency="PKR" /></TableCell>
+              <TableCell className="text-right font-semibold"><Money value={monthTotal} currency="PKR" /></TableCell>
               <TableCell />
             </TableRow>
           </TableFooter>

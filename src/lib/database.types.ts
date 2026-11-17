@@ -13,6 +13,7 @@ export type Database = {
           phone: string | null;
           salary_currency: "QAR" | "PKR" | "USD";
           number_locale: "en-US" | "en-IN";
+          history_cleared_at: Partial<Record<string, string>>;
           created_at: string;
         };
         Insert: {
@@ -21,6 +22,7 @@ export type Database = {
           phone?: string | null;
           salary_currency?: "QAR" | "PKR" | "USD";
           number_locale?: "en-US" | "en-IN";
+          history_cleared_at?: Partial<Record<string, string>>;
           created_at?: string;
         };
         Update: {
@@ -29,6 +31,7 @@ export type Database = {
           phone?: string | null;
           salary_currency?: "QAR" | "PKR" | "USD";
           number_locale?: "en-US" | "en-IN";
+          history_cleared_at?: Partial<Record<string, string>>;
           created_at?: string;
         };
         Relationships: [];

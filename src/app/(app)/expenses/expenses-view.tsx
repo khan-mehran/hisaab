@@ -8,12 +8,14 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "@/components/app/page-header";
+import { HistoryButtons } from "@/components/app/history-button";
+import { isCleared } from "@/lib/history";
 import { MonthPicker, useSelectedMonth } from "@/components/app/month-context";
 import { Money } from "@/components/app/amount";
 import { RowActions } from "@/components/app/row-actions";
 import { TableEmpty, TableError, TableSkeleton } from "@/components/app/table-states";
 import { EntityFormDialog, type FieldDef } from "@/components/form/entity-form-dialog";
-import { useAction, useExpenses, useMoney, useRate } from "@/lib/queries";
+import { useAction, useClearedAt, useExpenses, useMoney, useRate } from "@/lib/queries";
 import { deleteEntity, saveEntity } from "../actions";
 import { EXPENSE_CATEGORIES, expenseSchema, type ExpenseInput } from "@/lib/validation/schemas";
 import type { Tables } from "@/lib/database.types";
@@ -99,7 +101,10 @@ function toForm(e: Expense): ExpenseInput {
 
 function ExpenseTab({ period }: { period: Period }) {
   const [month] = useSelectedMonth();
-  const { data: rows, isLoading, error } = useExpenses(period, month);
+  const { data, isLoading, error } = useExpenses(period, month);
+  // Entries cleared with "Clear month" live under History.
+  const clearedAt = useClearedAt("expenses");
+  const rows = data?.filter((r) => !isCleared(r.created_at, clearedAt));
   const { data: rate } = useRate();
   const money = useMoney();
   const save = useAction(saveEntity);
@@ -120,7 +125,7 @@ function ExpenseTab({ period }: { period: Period }) {
 
   return (
     <div className="grid gap-3">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm text-muted-foreground">Total {label} · {monthLabel(month)}</p>
           <p className="text-xl font-semibold tracking-tight num">
@@ -130,9 +135,12 @@ function ExpenseTab({ period }: { period: Period }) {
             )}
           </p>
         </div>
-        <Button onClick={openAdd}>
-          <PlusIcon /> Add
-        </Button>
+        <div className="flex items-center gap-2">
+          <HistoryButtons section="expenses" />
+          <Button onClick={openAdd}>
+            <PlusIcon /> Add
+          </Button>
+        </div>
       </div>
 
       <Card className="py-0">

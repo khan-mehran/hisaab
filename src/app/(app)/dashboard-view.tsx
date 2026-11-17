@@ -1,9 +1,12 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRightIcon,
   BanknoteIcon,
+  EyeIcon,
+  EyeOffIcon,
   VaultIcon,
   ReceiptIcon,
   ScaleIcon,
@@ -22,8 +25,26 @@ import { computeBalance, computeZakat, salaryForMonth, sumTotals, type MonthTota
 import { qarToPkr } from "@/lib/currency";
 import { monthLabel, shortMonthLabel } from "@/lib/dates";
 
+const SALARY_VISIBLE_KEY = "salary-visible";
+
 export function DashboardView() {
   const [month] = useSelectedMonth();
+  // Salary is hidden until revealed; the choice is remembered on this device.
+  const [salaryVisible, setSalaryVisible] = useState(false);
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time restore after hydration
+      if (localStorage.getItem(SALARY_VISIBLE_KEY) === "1") setSalaryVisible(true);
+    } catch {}
+  }, []);
+  const toggleSalary = () => {
+    setSalaryVisible((v) => {
+      try {
+        localStorage.setItem(SALARY_VISIBLE_KEY, v ? "0" : "1");
+      } catch {}
+      return !v;
+    });
+  };
   const { data: profile } = useProfile();
   const { data: rate } = useRate();
   const incomes = useIncomes();
@@ -84,17 +105,35 @@ export function DashboardView() {
           icon={BanknoteIcon}
           tone="primary"
           loading={loading}
+          action={
+            <button
+              type="button"
+              onClick={toggleSalary}
+              aria-label={salaryVisible ? "Hide salary" : "Show salary"}
+              aria-pressed={salaryVisible}
+              className="flex size-8 items-center justify-center rounded-lg text-primary-foreground/85 outline-none transition-colors hover:bg-white/15 focus-visible:ring-2 focus-visible:ring-white/60"
+            >
+              {salaryVisible ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
+            </button>
+          }
           footer={
             carriedOver
               ? `Carried over from ${shortMonthLabel(income!.month)}`
-              : income && income.currency !== "QAR"
+              : salaryVisible && income && income.currency !== "QAR"
                 ? `Saved as ${money.format(Number(income.amount), income.currency)}`
                 : undefined
           }
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <AmountStack size="lg" primary={salaryQar ?? 0} primaryCurrency="QAR" secondary={pkr(salaryQar ?? 0)} secondaryCurrency="PKR" />
-            {zakatQar > 0 && (
+            {salaryVisible ? (
+              <AmountStack size="lg" primary={salaryQar ?? 0} primaryCurrency="QAR" secondary={pkr(salaryQar ?? 0)} secondaryCurrency="PKR" />
+            ) : (
+              <div className="flex flex-col" aria-label="Salary hidden">
+                <span className="text-2xl font-semibold tracking-tight sm:text-3xl">QAR ******</span>
+                <span className="text-xs text-muted-foreground">Rs ******</span>
+              </div>
+            )}
+            {salaryVisible && zakatQar > 0 && (
               <div className="rounded-lg bg-white/10 px-4 py-2 ring-1 ring-white/15">
                 <p className="mb-1 text-xs text-primary-foreground/75">Zakat (2.5%)</p>
                 <AmountStack size="sm" primary={zakatQar} primaryCurrency="QAR" secondary={pkr(zakatQar)} secondaryCurrency="PKR" />

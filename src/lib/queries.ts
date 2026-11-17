@@ -9,6 +9,7 @@ import type { ActionResult } from "@/lib/action-result";
 import type { RateInfo } from "@/lib/rates/get-rate";
 import { formatMoney, type Currency, type NumberLocale } from "@/lib/currency";
 import { monthStart, nextMonthStart } from "@/lib/dates";
+import type { HistorySection } from "@/lib/history";
 
 /**
  * Read hooks. Reads go straight to Supabase from the browser; Row Level
@@ -58,6 +59,12 @@ export function useProfile() {
       check(await db().from("profiles").select("*").maybeSingle(), "profile", null) as Tables<"profiles"> | null,
     staleTime: 5 * 60_000,
   });
+}
+
+/** When "Clear month" was last pressed on a page (ISO time), or null if never. */
+export function useClearedAt(section: HistorySection): string | null {
+  const { data: profile } = useProfile();
+  return profile?.history_cleared_at?.[section] ?? null;
 }
 
 /** Money formatter that follows the user's number format setting. */
@@ -127,6 +134,18 @@ export function useExpenses(period: Tables<"expenses">["period"], month: string)
           .lt("date_from", nextMonthStart(month))
           .order("date_from", { ascending: false })
           .order("created_at", { ascending: false }),
+        "expenses",
+      ) as Tables<"expenses">[],
+  });
+}
+
+/** Every expense of every period, newest first (for History). */
+export function useAllExpenses() {
+  return useQuery({
+    queryKey: ["expenses", "all"],
+    queryFn: async () =>
+      check(
+        await db().from("expenses").select("*").order("date_from", { ascending: false }).order("created_at", { ascending: false }),
         "expenses",
       ) as Tables<"expenses">[],
   });

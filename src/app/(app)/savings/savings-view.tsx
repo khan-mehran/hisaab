@@ -13,7 +13,9 @@ import { RowActions } from "@/components/app/row-actions";
 import { RateNote } from "@/components/app/rate-note";
 import { TableEmpty, TableError, TableSkeleton } from "@/components/app/table-states";
 import { EntityFormDialog } from "@/components/form/entity-form-dialog";
-import { useAction, useRate, useSavings } from "@/lib/queries";
+import { HistoryButtons } from "@/components/app/history-button";
+import { isCleared } from "@/lib/history";
+import { useAction, useClearedAt, useMoney, useRate, useSavings } from "@/lib/queries";
 import { deleteEntity, saveEntity } from "../actions";
 import { BANK_NAMES, BANKS, savingsSchema } from "@/lib/validation/schemas";
 import { qarToPkr, round2 } from "@/lib/currency";
@@ -31,14 +33,18 @@ const TEXT = {
 export function SavingsView({ kind }: { kind: Kind }) {
   const query = useSavings(kind);
   const { data: rate } = useRate();
+  const money = useMoney();
   const save = useAction(saveEntity);
   const remove = useAction(deleteEntity, "Saving deleted");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Tables<"savings"> | null>(null);
   const t = TEXT[kind];
 
-  const rows = query.data ?? [];
+  // Entries cleared with "Clear month" live under History.
+  const clearedAt = useClearedAt(`${kind}-savings`);
+  const rows = (query.data ?? []).filter((r) => !isCleared(r.created_at, clearedAt));
   const total = round2(rows.reduce((s, r) => s + Number(r.amount_qar), 0));
+  const allTime = round2((query.data ?? []).reduce((s, r) => s + Number(r.amount_qar), 0));
   const pkr = (qar: number) => (rate ? qarToPkr(qar, rate.qarPkr) : null);
   const COLS = 4;
 
@@ -48,18 +54,28 @@ export function SavingsView({ kind }: { kind: Kind }) {
         title={t.title}
         description={`${t.description} Saved amounts are deducted from your balance.`}
         actions={
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setOpen(true);
-            }}
-          >
-            <PlusIcon /> Add
-          </Button>
+          <>
+            <HistoryButtons section={`${kind}-savings`} canClear={rows.length > 0} />
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setOpen(true);
+              }}
+            >
+              <PlusIcon /> Add
+            </Button>
+          </>
         }
       />
 
-      <StatCard title={`Total ${t.title.toLowerCase()}`} icon={t.icon} tone="primary" loading={query.isLoading} className="sm:max-w-sm">
+      <StatCard
+        title={`Total ${t.title.toLowerCase()}`}
+        icon={t.icon}
+        tone="primary"
+        loading={query.isLoading}
+        className="sm:max-w-sm"
+        footer={allTime !== total ? `Including History: ${money.qar(allTime)}` : undefined}
+      >
         <AmountStack size="lg" primary={total} primaryCurrency="QAR" secondary={pkr(total)} secondaryCurrency="PKR" />
       </StatCard>
 

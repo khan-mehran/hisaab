@@ -11,6 +11,7 @@ export function CharityView() {
     <PoolLedger
       pool="charity"
       entity="charity_entries"
+      history="charity"
       title="Charity"
       description="Charity given from the amount you allocated on the Sent page."
       icon={HandHeartIcon}

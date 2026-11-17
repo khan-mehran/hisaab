@@ -10,12 +10,14 @@ type Props = {
   /** "primary" renders the maroon highlight card (e.g. Balance). */
   tone?: "default" | "primary";
   footer?: React.ReactNode;
+  /** Small control shown at the right of the title row (e.g. a show/hide toggle). */
+  action?: React.ReactNode;
   loading?: boolean;
   className?: string;
 };
 
 /** Summary card: icon + title on top, amount(s) below. */
-export function StatCard({ title, icon: Icon, children, tone = "default", footer, loading, className }: Props) {
+export function StatCard({ title, icon: Icon, children, tone = "default", footer, action, loading, className }: Props) {
   const primary = tone === "primary";
   return (
     <Card
@@ -38,6 +40,7 @@ export function StatCard({ title, icon: Icon, children, tone = "default", footer
         <span className={cn("text-sm font-medium", primary ? "text-primary-foreground/85" : "text-muted-foreground")}>
           {title}
         </span>
+        {action && <span className="ml-auto flex items-center">{action}</span>}
       </div>
       {loading ? (
         <div className="grid gap-1.5">

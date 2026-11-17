@@ -14,11 +14,13 @@ import { RowActions } from "@/components/app/row-actions";
 import { TableEmpty, TableError, TableSkeleton } from "@/components/app/table-states";
 import { EntityFormDialog } from "@/components/form/entity-form-dialog";
 import { OthersBatchDialog } from "./others-batch-dialog";
-import { useAction, useOthers } from "@/lib/queries";
+import { useAction, useClearedAt, useOthers } from "@/lib/queries";
 import { deleteEntity, saveEntity, saveOthersBatch } from "../actions";
 import { otherEntrySchema } from "@/lib/validation/schemas";
 import { parseAmount, round2 } from "@/lib/currency";
 import { formatDate } from "@/lib/dates";
+import { isCleared } from "@/lib/history";
+import { HistoryButtons } from "@/components/app/history-button";
 import type { Tables } from "@/lib/database.types";
 
 export function OthersView() {
@@ -30,7 +32,9 @@ export function OthersView() {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Tables<"other_entries"> | null>(null);
 
-  const rows = query.data ?? [];
+  // Entries cleared with "Clear month" live under History.
+  const clearedAt = useClearedAt("others");
+  const rows = (query.data ?? []).filter((r) => !isCleared(r.created_at, clearedAt));
   const total = round2(rows.reduce((s, r) => s + Number(r.amount_pkr), 0));
   const COLS = 4;
 
@@ -40,9 +44,12 @@ export function OthersView() {
         title="Others"
         description="Other spending from the amount you allocated on the Sent page."
         actions={
-          <Button onClick={() => setAdding(true)}>
-            <PlusIcon /> Add
-          </Button>
+          <>
+            <HistoryButtons section="others" canClear={rows.length > 0} />
+            <Button onClick={() => setAdding(true)}>
+              <PlusIcon /> Add
+            </Button>
+          </>
         }
       />
 
