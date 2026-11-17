@@ -38,6 +38,7 @@ const EMPTY_SEND: SendInput = {
   sent_date: "",
   amount_qar: "",
   bank: undefined as unknown as SendInput["bank"],
+  rate_qar_pkr: "",
 };
 
 export function SentView() {
@@ -203,6 +204,7 @@ export function SentView() {
                 sent_date: editing.sent_date,
                 amount_qar: String(Number(editing.amount_qar)),
                 bank: editing.bank,
+                rate_qar_pkr: String(Number(editing.rate_qar_pkr)),
               }
             : { ...EMPTY_SEND, sent_date: todayISO() }
         }

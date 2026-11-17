@@ -35,7 +35,6 @@ export const num = (v: unknown) => {
 export function SendFormDialog({ open, onOpenChange, editing, defaultValues, onSubmit }: Props) {
   const { data: liveRate } = useRate();
   const money = useMoney();
-  const rate = editing ? Number(editing.rate_qar_pkr) : liveRate?.qarPkr;
 
   const { register, control, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<SendInput>({
     resolver: zodResolver(sendSchema, undefined, { raw: true }),
@@ -49,6 +48,9 @@ export function SendFormDialog({ open, onOpenChange, editing, defaultValues, onS
   }, [open]);
 
   const amount = num(v.amount_qar);
+  // The rate typed in wins; otherwise the saved rate (editing) or today's rate.
+  const fallbackRate = editing ? Number(editing.rate_qar_pkr) : liveRate?.qarPkr;
+  const rate = num(v.rate_qar_pkr) || fallbackRate;
   // An edited send can't go below what is already allocated from it.
   const check = validateAllocation({
     amount,
@@ -66,7 +68,7 @@ export function SendFormDialog({ open, onOpenChange, editing, defaultValues, onS
           <DialogTitle>{editing ? "Edit send" : "Send money"}</DialogTitle>
           <DialogDescription>
             {editing
-              ? `Locked at 1 QAR = Rs ${Number(editing.rate_qar_pkr).toFixed(2)} (sent ${formatDate(editing.sent_date)}).`
+              ? `Sent ${formatDate(editing.sent_date)}. Changing the rate keeps each pool's PKR amount.`
               : "The amount is deducted from your salary balance."}
           </DialogDescription>
         </DialogHeader>
@@ -103,6 +105,23 @@ export function SendFormDialog({ open, onOpenChange, editing, defaultValues, onS
               </Field>
             </div>
           </div>
+
+          <Field label="Exchange rate (1 QAR = Rs)" htmlFor="rate_qar_pkr" error={errors.rate_qar_pkr?.message}>
+            <Input
+              id="rate_qar_pkr"
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              placeholder={liveRate ? liveRate.qarPkr.toFixed(2) : "e.g. 76.20"}
+              aria-invalid={!!errors.rate_qar_pkr || undefined}
+              className="h-10 num"
+              {...register("rate_qar_pkr")}
+            />
+            <p className="text-xs text-muted-foreground">
+              The rate your bank gave you.
+              {liveRate && ` Leave blank to use today's rate (${liveRate.qarPkr.toFixed(2)}).`}
+            </p>
+          </Field>
 
           <Field label="Amount sent" htmlFor="amount_qar" error={errors.amount_qar?.message}>
             <MoneyInput id="amount_qar" currency="QAR" invalid={!!errors.amount_qar} {...register("amount_qar")} />

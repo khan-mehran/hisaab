@@ -49,3 +49,26 @@ export const EMPTY_TOTALS: MonthTotals = {
   personalSavingsQar: 0,
   familySavingsQar: 0,
 };
+
+export type TotalsRow = {
+  expenses_qar: number | null;
+  sent_qar: number | null;
+  personal_savings_qar: number | null;
+  family_savings_qar: number | null;
+};
+
+/**
+ * Add up monthly_totals rows. A carried-over salary is spent across every
+ * month since it was saved, so the balance sums all of those months.
+ */
+export function sumTotals(rows: TotalsRow[]): MonthTotals {
+  return rows.reduce<MonthTotals>(
+    (t, r) => ({
+      expensesQar: round2(t.expensesQar + Number(r.expenses_qar ?? 0)),
+      sentQar: round2(t.sentQar + Number(r.sent_qar ?? 0)),
+      personalSavingsQar: round2(t.personalSavingsQar + Number(r.personal_savings_qar ?? 0)),
+      familySavingsQar: round2(t.familySavingsQar + Number(r.family_savings_qar ?? 0)),
+    }),
+    EMPTY_TOTALS,
+  );
+}

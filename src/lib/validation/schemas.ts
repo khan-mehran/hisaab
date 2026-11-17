@@ -90,10 +90,23 @@ export const expenseSchema = z
     date_to: d.period === "weekly" ? d.date_to! : null,
   }));
 
+/** Optional QAR->PKR rate; blank means "use today's rate" (or keep the saved one). */
+export const optionalRate = amountInput
+  .optional()
+  .transform((v) => (v === undefined || v === "" ? undefined : parseAmount(v)))
+  .pipe(
+    z
+      .number({ error: "Enter a valid rate" })
+      .positive({ error: "Must be more than 0" })
+      .max(10_000, { error: "Rate is too large" })
+      .optional(),
+  );
+
 export const sendSchema = z.object({
   sent_date: isoDate,
   amount_qar: amount,
   bank,
+  rate_qar_pkr: optionalRate,
 });
 
 /**

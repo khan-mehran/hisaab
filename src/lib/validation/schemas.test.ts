@@ -10,6 +10,16 @@ describe("sendSchema", () => {
     expect(sendSchema.parse(base)).toEqual({ sent_date: "2026-10-05", amount_qar: 1500, bank: "HBL" });
   });
 
+  it("parses a custom rate and treats a blank rate as not given", () => {
+    expect(sendSchema.parse({ ...base, rate_qar_pkr: "76.23" }).rate_qar_pkr).toBe(76.23);
+    expect(sendSchema.parse({ ...base, rate_qar_pkr: "" }).rate_qar_pkr).toBeUndefined();
+  });
+
+  it("rejects a zero or invalid rate", () => {
+    expect(sendSchema.safeParse({ ...base, rate_qar_pkr: "0" }).success).toBe(false);
+    expect(sendSchema.safeParse({ ...base, rate_qar_pkr: "abc" }).success).toBe(false);
+  });
+
   it("ignores allocations, so editing a send keeps them", () => {
     expect(sendSchema.parse({ ...base, charity_qar: "200" })).not.toHaveProperty("charity_qar");
   });

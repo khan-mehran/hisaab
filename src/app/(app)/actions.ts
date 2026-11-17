@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getRate, RATE_CACHE_TAG } from "@/lib/rates/get-rate";
-import { toQar } from "@/lib/currency";
+import { round2, toQar } from "@/lib/currency";
 import { nextPartQar } from "@/lib/calc/pools";
 import { phoneToEmail, toE164 } from "@/lib/phone";
 import { DELETABLE, ENTITIES, type DeletableTable, type EntityInput, type EntityName } from "@/lib/entities";
@@ -103,29 +103,54 @@ export async function deleteEntity(table: DeletableTable, id: string): Promise<A
 }
 
 // ---------------------------------------------------------------------------
-// Sends: the exchange rate is locked server-side when the send is created
+// Sends: the exchange rate is locked when the send is created, either the
+// rate the user actually got or the live rate
 // ---------------------------------------------------------------------------
 
 export async function saveSend(input: SendInput, id?: string): Promise<ActionResult> {
   if (id !== undefined && !uuid.safeParse(id).success) return fail("Invalid record.");
   const parsed = sendSchema.safeParse(input);
   if (!parsed.success) return validationFail(parsed.error);
+  const { rate_qar_pkr: customRate, ...values } = parsed.data;
 
   const s = await session();
   if (!s) return fail(SESSION_EXPIRED);
 
   if (id) {
-    // Editing keeps the original rate so history never changes.
-    const { error } = await s.supabase.from("sends").update(parsed.data).eq("id", id);
+    const { data: send, error: loadError } = await s.supabase
+      .from("sends")
+      .select("rate_qar_pkr, charity_qar, debt_qar, installments_qar, others_qar")
+      .eq("id", id)
+      .maybeSingle();
+    if (loadError) return dbFail(loadError, "load send");
+    if (!send) return fail("That entry no longer exists.");
+
+    // Correcting the rate keeps each pool's PKR amount, which is what was entered.
+    const oldRate = Number(send.rate_qar_pkr);
+    const rescale = customRate !== undefined && customRate !== oldRate;
+    const part = (qar: number) => round2((Number(qar) * oldRate) / customRate!);
+    const { error } = await s.supabase
+      .from("sends")
+      .update(
+        rescale
+          ? {
+              ...values,
+              rate_qar_pkr: customRate,
+              charity_qar: part(send.charity_qar),
+              debt_qar: part(send.debt_qar),
+              installments_qar: part(send.installments_qar),
+              others_qar: part(send.others_qar),
+            }
+          : values,
+      )
+      .eq("id", id);
     return error ? dbFail(error, "update send") : { ok: true };
   }
 
-  const rate = await getRate();
-  if (!rate) return fail("Exchange rate is unavailable right now. Please try again shortly.");
+  const rate = customRate ?? (await getRate())?.qarPkr;
+  if (!rate) return fail("Exchange rate is unavailable right now. Enter the rate you got, or try again shortly.");
 
-  const { error } = await s.supabase
-    .from("sends")
-    .insert({ ...parsed.data, rate_qar_pkr: rate.qarPkr });
+  const { error } = await s.supabase.from("sends").insert({ ...values, rate_qar_pkr: rate });
   return error ? dbFail(error, "insert send") : { ok: true };
 }
 

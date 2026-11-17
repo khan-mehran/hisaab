@@ -17,8 +17,8 @@ import { StatCard } from "@/components/app/stat-card";
 import { AmountStack } from "@/components/app/amount";
 import { MonthPicker, useSelectedMonth } from "@/components/app/month-context";
 import { RateNote } from "@/components/app/rate-note";
-import { useIncomes, useMoney, useMonthlyTotals, useProfile, useRate } from "@/lib/queries";
-import { computeBalance, computeZakat, EMPTY_TOTALS, salaryForMonth, type MonthTotals } from "@/lib/calc/balance";
+import { useIncomes, useMoney, useMonthlyTotalsRange, useProfile, useRate } from "@/lib/queries";
+import { computeBalance, computeZakat, salaryForMonth, sumTotals, type MonthTotals } from "@/lib/calc/balance";
 import { qarToPkr } from "@/lib/currency";
 import { monthLabel, shortMonthLabel } from "@/lib/dates";
 
@@ -27,23 +27,19 @@ export function DashboardView() {
   const { data: profile } = useProfile();
   const { data: rate } = useRate();
   const incomes = useIncomes();
-  const totalsQuery = useMonthlyTotals(month);
   const money = useMoney();
 
-  const loading = incomes.isLoading || totalsQuery.isLoading;
   const income = salaryForMonth(incomes.data ?? [], month);
   const salaryQar = income ? Number(income.amount_qar) : null;
+  const salaryMonth = income ? income.month.slice(0, 7) : null;
+  const carriedOver = salaryMonth != null && salaryMonth !== month;
+  // A carried-over salary pays for every month since it was saved, so the
+  // cards and balance cover that whole span. Without a salary: just this month.
+  const sinceSalaryQuery = useMonthlyTotalsRange(salaryMonth ?? month, month);
+  const loading = incomes.isLoading || sinceSalaryQuery.isLoading;
 
-  const row = totalsQuery.data;
-  const totals: MonthTotals = row
-    ? {
-        expensesQar: Number(row.expenses_qar),
-        sentQar: Number(row.sent_qar),
-        personalSavingsQar: Number(row.personal_savings_qar),
-        familySavingsQar: Number(row.family_savings_qar),
-      }
-    : EMPTY_TOTALS;
-  const balance = computeBalance(salaryQar, totals);
+  const sinceSalary = sumTotals(sinceSalaryQuery.data ?? []);
+  const balance = computeBalance(salaryQar, sinceSalary);
   const zakatQar = computeZakat(salaryQar ?? 0);
 
   // Live rate for PKR equivalents; fall back to the rate saved with the salary.
@@ -52,10 +48,10 @@ export function DashboardView() {
   const firstName = profile?.name?.split(" ")[0];
 
   const cards = [
-    { title: "Total Expenses", icon: ReceiptIcon, qar: totals.expensesQar, href: "/expenses" },
-    { title: "Total Sent", icon: SendIcon, qar: totals.sentQar, href: "/sent" },
-    { title: "Personal Savings", icon: VaultIcon, qar: totals.personalSavingsQar, href: "/savings/personal" },
-    { title: "Family Savings", icon: UsersIcon, qar: totals.familySavingsQar, href: "/savings/family" },
+    { title: "Total Expenses", icon: ReceiptIcon, qar: sinceSalary.expensesQar, href: "/expenses" },
+    { title: "Total Sent", icon: SendIcon, qar: sinceSalary.sentQar, href: "/sent" },
+    { title: "Personal Savings", icon: VaultIcon, qar: sinceSalary.personalSavingsQar, href: "/savings/personal" },
+    { title: "Family Savings", icon: UsersIcon, qar: sinceSalary.familySavingsQar, href: "/savings/family" },
   ];
 
   return (
@@ -89,8 +85,8 @@ export function DashboardView() {
           tone="primary"
           loading={loading}
           footer={
-            income && income.month.slice(0, 7) !== month
-              ? `Carried over from ${shortMonthLabel(income.month)}`
+            carriedOver
+              ? `Carried over from ${shortMonthLabel(income!.month)}`
               : income && income.currency !== "QAR"
                 ? `Saved as ${money.format(Number(income.amount), income.currency)}`
                 : undefined
@@ -110,7 +106,13 @@ export function DashboardView() {
           title="Balance"
           icon={ScaleIcon}
           loading={loading}
-          footer={salaryQar != null ? "Salary − expenses − sent − savings" : "Shows 0 until a salary is saved"}
+          footer={
+            salaryQar == null
+              ? "Shows 0 until a salary is saved"
+              : carriedOver
+                ? `Salary − everything spent since ${shortMonthLabel(income!.month)}`
+                : "Salary − expenses − sent − savings"
+          }
         >
           <AmountStack size="lg" primary={balance} primaryCurrency="QAR" secondary={pkr(balance)} secondaryCurrency="PKR" />
         </StatCard>
@@ -126,7 +128,7 @@ export function DashboardView() {
         ))}
       </div>
 
-      {salaryQar != null && salaryQar > 0 && !loading && <SpendingBar salary={salaryQar} totals={totals} balance={balance} />}
+      {salaryQar != null && salaryQar > 0 && !loading && <SpendingBar salary={salaryQar} totals={sinceSalary} balance={balance} />}
 
       <RateNote />
     </div>

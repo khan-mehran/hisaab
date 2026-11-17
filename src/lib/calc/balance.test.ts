@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeBalance, computeZakat, EMPTY_TOTALS, salaryForMonth } from "./balance";
+import { computeBalance, computeZakat, EMPTY_TOTALS, salaryForMonth, sumTotals } from "./balance";
 
 describe("computeBalance", () => {
   it("is 0 before any salary is saved, even with spending", () => {
@@ -56,5 +56,18 @@ describe("salaryForMonth", () => {
   it("returns null before the first salary", () => {
     expect(salaryForMonth(incomes, "2026-07")).toBeNull();
     expect(salaryForMonth([], "2026-10")).toBeNull();
+  });
+});
+
+describe("sumTotals", () => {
+  it("adds sends from every month since the salary", () => {
+    const row = { expenses_qar: 0, sent_qar: 0, personal_savings_qar: 0, family_savings_qar: 0 };
+    const totals = sumTotals([{ ...row, sent_qar: 5000 }, { ...row, sent_qar: 1800 }]);
+    expect(totals.sentQar).toBe(6800);
+    expect(computeBalance(10000, totals)).toBe(3200);
+  });
+
+  it("is empty for no rows", () => {
+    expect(sumTotals([])).toEqual(EMPTY_TOTALS);
   });
 });

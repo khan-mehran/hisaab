@@ -97,6 +97,23 @@ export function useMonthlyTotals(month: string) {
   });
 }
 
+/** Monthly totals rows from `from` through `to` (both YYYY-MM, inclusive). */
+export function useMonthlyTotalsRange(from: string | null, to: string) {
+  return useQuery({
+    queryKey: ["monthly_totals", "range", from, to],
+    enabled: from != null,
+    queryFn: async () =>
+      check(
+        await db()
+          .from("monthly_totals")
+          .select("*")
+          .gte("month", monthStart(from!))
+          .lt("month", nextMonthStart(to)),
+        "monthly totals",
+      ) as Views<"monthly_totals">[],
+  });
+}
+
 export function useExpenses(period: Tables<"expenses">["period"], month: string) {
   return useQuery({
     queryKey: ["expenses", period, month],
